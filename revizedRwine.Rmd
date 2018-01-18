@@ -1,0 +1,390 @@
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r}
+setwd("C:/Users/sarab/Desktop/Udacity/EDAcoursework/eda-course-materials/lesson 5 R project")
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(reshape2)
+library(lubridate)
+library(ggthemes)
+library(gridExtra)
+library(GGally)
+library(memisc)
+library(RColorBrewer)
+library(RCurl)
+library(bitops)
+library(purrr)
+library(tidyr)
+```
+
+#Introduction
+
+Dataset: Red wine
+Observations: 1599
+Variables: 12
+
+I chose the wine quality dataset because I like wine, and I've made some python scripts to this dataset before.
+
+Using the statistical language R, I'm going to answer the sample guiding question: Which chemical properties influence the quality of red wines?
+
+I'm going to use the knowlege gained from the Udacity R programming lessons to showcase my results.
+
+```{r}
+rwine_df <-read.csv('winequality-red.csv',header = T,check.names = F, sep = ';')
+```
+
+The first step after loading the libraries, the directory, and the database, will be discovering the structure and the classes in the dataset
+
+```{r}
+str(rwine_df)
+```
+
+As shown above, the dataset classes consist of mainly num or in python, floats, with the exeption of quality.
+
+The question I've decided to explore is:
+  -Which chemical properties have a statically significant          correlation to the quality of wine?
+
+I chose this question because quality is the only qualitative variable, so comparing the quantitative variables will have the most interesting conclusion.
+
+```{r}
+names(rwine_df) <- sub(" ", "_", names(rwine_df))
+names(rwine_df) <- sub(" ", "_", names(rwine_df))
+```
+
+In this cell, I'm changing the empty spaces in the title with "_" in order to not come up with errors in later code
+
+
+```{r}
+summary(rwine_df)
+```
+
+Although quality is a scale from 1-10, this data set only has quality in a range of 3-8.
+
+#Univariate Plots Section
+
+```{r}
+head(rwine_df)
+```
+
+#Univariate Plots
+
+```{r}
+ggplot(aes(x = quality), data = rwine_df)+
+geom_bar(colour="black", fill="#993366", width=.9)+
+    scale_x_continuous(breaks = unique(rwine_df$quality))+
+    xlab("Wine Grade") + ylab("Count") +
+    ggtitle("Red Wine Quality Counts")
+```
+
+This chart shows the counts of the different quality levels of red wine. It appears that majorities of the wines have a quality level of either 5 or 6. This might create problems later on being that there might not be enough data to find trends outside of these levels.
+
+
+```{r}
+rwine_df$categorical_quality <- factor(rwine_df$quality,
+levels = c(3,4,5,6,7,8),
+labels = c("poor","fair","average","decent","good","very_good"))
+
+numeric_quality <- c(3,4,5,6,7,8)
+categorical_quality <- c("poor","fair","average","decent","good","very_good")
+
+quality_compare <- data.frame(x=categorical_quality, y=numeric_quality)
+quality_compare$x <-factor(quality_compare$x, levels=unique(quality_compare$x))
+
+ggplot(data =quality_compare,aes(x,y))+
+  geom_point()+
+  ggtitle("Quality to Categorical Quality")
+```
+
+I created a categorical quality variable to explain how I define each quality level from 3-8.
+
+
+```{r}
+rwine_df$categorical_quality<-NULL
+head(rwine_df)
+
+all_but_quality <- subset(rwine_df, select = -c(quality))
+
+means_by_quality<-aggregate(all_but_quality, list(rwine_df$quality), mean)
+colnames(means_by_quality)[1] <- "quality"
+means_by_quality <- melt(means_by_quality,id="quality")
+colnames(means_by_quality)[c(2,3)]<-c("chemical_property","mean")
+
+median_by_quality<-aggregate(all_but_quality, list(rwine_df$quality), median)
+colnames(median_by_quality)[1] <- "quality"
+median_by_quality <- melt(median_by_quality,id="quality")
+colnames(median_by_quality)[c(2,3)]<-c("chemical_property","median")
+
+means_by_quality_plot<- ggplot(aes(x=quality, y=mean),data=means_by_quality)+
+  geom_bar(stat="identity")+
+  facet_wrap(~chemical_property,scale="free")
+
+median_by_quality_plot<-ggplot(aes(x=quality,y=median),data=median_by_quality)+
+  geom_bar(stat="identity")+
+  facet_wrap(~chemical_property,scale="free")
+  
+means_by_quality_plot
+```
+
+These charts show the means of each quality levels chemical properties. 
+
+Although the charts arent the easiest to read because they are so small, I chose to do it this way so I could get a basic idea of which chemical properties might have a correlation with quality.
+
+Here, it appears that there may be a negative correlation between:
+-volatile acidity and chlorides
+
+In the positive, there is:
+-citric acid, sulphates, and alcohol
+
+```{r}
+median_by_quality_plot
+```
+
+I also chose to do the median to see if there was much of a difference with the outliers taken out.
+
+The charts seem similar, but citric acid seems that without it's outliers, there may be a stronger correlation.
+
+
+Chemical Property Distribution
+
+```{r}
+p1<-
+  ggplot(aes(x = fixed_acidity), data = rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+p2<-
+  ggplot(aes(x = volatile_acidity), data = rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+p3<-
+  ggplot(aes(x = citric_acid), data = rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+p4<-
+  ggplot(aes(x = residual_sugar), data = rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+p5<-
+  ggplot(aes(x = chlorides), data = rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+p6<-
+  ggplot(aes(x = free_sulfur_dioxide), data = rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+p7<-
+  ggplot(aes(x = total_sulfur_dioxide), data = rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+p8<-
+  ggplot(aes(x = density), data =rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+p9<-
+  ggplot(aes(x = pH), data = rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+p10<-
+  ggplot(aes(x = sulphates), data = rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+p11<-
+  ggplot(aes(x = alcohol), data = rwine_df)+
+        geom_bar(colour="#993366")+
+        scale_x_continuous()
+
+grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,ncol=3)
+```
+
+Again, I chose to facet wrap just because I wanted to see if the values were normally distributed.
+
+fixed_axidity, volatle_acidity, resudual sugar, chlorides, density, pH, sulphates, and alcohol(maybe) seem normally disrtibuted
+
+Chlorides and residual sugar seem to have some outliers, so I'll take the log10 of them so I create a more accurate distribution
+
+```{r}
+chloride_log10 <- ggplot(rwine_df,aes(x=chlorides))+
+  geom_bar(colour="#993366")+
+  xlab("log10 chlorides")+
+  scale_x_log10()
+
+residual_sugar_log10 <-ggplot(rwine_df,aes(x=residual_sugar))+
+  geom_bar(colour="#993366")+
+  xlab("log10 residual_sugar")+
+  scale_x_log10()
+
+chloride_log10
+```
+
+```{r}
+residual_sugar_log10
+```
+
+#Multivariate Plots
+
+I chose to make the following charts to see which chemical properties to focus on. 
+
+```{r}
+q1<-ggplot(rwine_df, aes(x = alcohol, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("Alcohol Levels to Quality")
+
+q2<-ggplot(rwine_df, aes(x = fixed_acidity, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("Fixed_Acidity Levels to Quality")
+
+q3<-ggplot(rwine_df, aes(x = volatile_acidity, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("Volatile_Vcidity Levels to Quality")
+
+q4<-ggplot(rwine_df, aes(x = citric_acid, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("Citric_Acid Levels to Quality")
+
+
+q5<-ggplot(rwine_df, aes(x = residual_sugar, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("Residual_Sugar Levels to Quality")
+
+
+q6<-ggplot(rwine_df, aes(x = chlorides, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("Chloride Levels to Quality")
+
+
+q7<-ggplot(rwine_df, aes(x = free_sulfur_dioxide, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("Free_Sulfur_Dioxide Levels to Quality")
+
+
+q8<-ggplot(rwine_df, aes(x = total_sulfur_dioxide, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("Total_Sulfur_Dioxide Levels to Quality")
+
+
+q9<-ggplot(rwine_df, aes(x = density, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("Density Levels to Quality")
+
+
+q10<-ggplot(rwine_df, aes(x = pH, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("pH Levels to Quality")
+
+
+q11<-ggplot(rwine_df, aes(x = sulphates, y = quality)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  ggtitle("Sulphates Levels to Quality")
+
+grid.arrange(q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q11,ncol=5)
+```
+
+By taking a quick look at these charts, I can see which chemical properties appear to have more effect on quality. In order to make it easier on the eyes, I will split up the charts into 3 groups: positive_trends, neutral_trends, and negative_trends
+
+
+```{r}
+positive_trends <- grid.arrange(q1,q2,q4,q11,ncol=2)
+```
+
+These carts show the chemical properties that visually seem more likely to to effect quality in a positive direction, meaning that there is more of a positive correlation between the chemical property and the quality
+
+```{r}
+neutral_trends <-grid.arrange(q5,q7,ncol=2)
+```
+
+These carts show the chemical properties that visually seem more likely to to effect quality in a neutral direction, meaning that there is probably not much correlation between the chemical property and the quality
+
+
+```{r}
+negative_trends <-grid.arrange(q3,q6,q8,q9,q10,ncol=3)
+```
+
+These carts show the chemical properties that visually seem more likely to to effect quality in a negative direction, meaning that there is more of a negative correlation between the chemical property and the quality
+
+
+Although visually there seems to be a correlation, calculations still need to be made to see if the correlation is statistically significant enough to draw any conclusions.
+
+
+#Final Plots
+
+I'm going to choose the plots that stand out the most of having more of a positive/negative impact on quality:
+
+positive:
+Alcohol
+Sulphates
+
+negative:
+Volitile_Acidity
+Chloride
+
+```{r}
+ggplot(rwine_df, aes(x = alcohol, y = sulphates, color = quality)) +
+  geom_jitter() +
+  scale_color_gradient(high = 'red', low = 'blue')+
+  ggtitle("Sulphates and Alcohol to Quality")
+```
+
+As expected, there is visual evidence that higher Sulphate and Alcohol levels appear by number to lean more towards the higher quality direction.
+
+
+```{r}
+ggplot(rwine_df, aes(x = chlorides, y =volatile_acidity,color = quality)) +
+  xlim(0,quantile(rwine_df$chlorides,.95))+
+  geom_jitter()+
+  scale_color_gradient(high = 'red', low = 'blue')+
+  ggtitle("Volatile_Acidity and Clorides to Quality")
+```
+
+As expected, there is visual evidence that higher Volatile_Acidity and Chloride levels appear by number to lean more towards the lower quality direction.
+
+
+My final plot will show the correlations between quality and all of the chemical properties to see if my assumptions were right.
+
+```{r}
+set.seed(123)
+ggpairs(rwine_df[sample.int(nrow(rwine_df),1000),])
+```
+
+#Summary
+
+
+These are the correlations to quality that I discovered (from high to low):
+
+1. alcohol +.491
+2. volitile acidity -.4
+3. sulphates +.255
+4. citric acid +.237
+5. density -.174
+6. total sulfur dioxide -.148
+7. chlorides -.131
+8. fixed acidity .125
+9. pH -.0606
+10. residual sugar .00998
+11. free sulfur dioxide -.00955
+
+#Reflection
+
+I'd say that there is evidence for correlation on everything above density: 1-4. 
+
+Although through my previous visual observations, I had originally thought that chloride levels would have a stronger effect on quality, it doesn't seems less significant than I had hypothesised.
+
+Since most of the wine data had a quality level of 5 and 6, my data might have shown a more stronger correlation of the chemical properties if it had contained more data from the lower and the higher levels. If I were to do an analysis again, I would try to find more examples of higher and lower quality wines.
+
+On a last note, quality is qualitative, so it depends on human oppinion. Therefore, even if professionals were in charge of deciding the levels of quality, it's still dependant on human opinion. 
+
